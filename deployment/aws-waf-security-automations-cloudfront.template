@@ -50,6 +50,30 @@ Parameters:
     Type: String
   GlueWafAccessLogsTable:
     Type: String
+  MaxExpectedURISize:
+    Type: Number
+    Description: Maximum number of bytes allowed in the URI component of the HTTP request. Generally the maximum possible value is determined by the server operating system (maps to file system paths), the web server software, or other middleware components. Choose a value that accomodates the largest URI segment you use in practice in your web application.
+    Default: 512
+  MaxExpectedQueryStringSize:
+    Type: Number
+    Description: Maximum number of bytes allowed in the query string component of the HTTP request. Normally the  of query string parameters following the "?" in a URL is much larger than the URI , but still bounded by the  of the parameters your web application uses and their values.
+    Default: 1024
+  MaxExpectedBodySize:
+    Type: Number
+    Description: Maximum number of bytes allowed in the body of the request. If you do not plan to allow large uploads, set it to the largest payload value that makes sense for your web application. Accepting unnecessarily large values can cause performance issues, if large payloads are used as an attack vector against your web application.
+    Default: 16384
+  MaxExpectedCookieSize:
+    Type: Number
+    Description: Maximum number of bytes allowed in the cookie header. The maximum size should be less than 4096, the size is determined by the amount of information your web application stores in cookies. If you only pass a session token via cookies, set the size to no larger than the serialized size of the session token and cookie metadata.
+    Default: 4093
+  CSRFExpectedHeader:
+    Type: String
+    Description: The custom HTTP request header, where the CSRF token value is expected to be encountered
+    Default: x-csrf-token
+  CSRFExpectedSize:
+    Type: Number
+    Description: The size in bytes of the CSRF token value. For example if it's a canonically formatted UUIDv4 value the expected size would be 36 bytes/ASCII characters
+    Default: 36
 
 Conditions:
   SqlInjectionProtectionActivated: !Equals
@@ -96,12 +120,113 @@ Conditions:
     - !Ref ActivateBadBotProtectionParam
     - 'yes'
 
-
 Resources:
   WAFWhitelistSet:
     Type: 'AWS::WAF::IPSet'
     Properties:
       Name: !Sub '${ParentStackName} - Whitelist Set'
+      IPSetDescriptors:
+      ##Citrix
+      - 
+        Type: "IPV4"
+        Value: "209.171.43.251/32"
+      -
+        Type: "IPV4"
+        Value: "69.162.124.224/28"
+      -
+        Type: "IPV4"
+        Value: "63.143.42.240/28"
+      -
+        Type: "IPV4"
+        Value: "216.245.221.80/28"
+      -
+        Type: "IPV4"
+        Value: "104.131.107.63/32"
+      -
+        Type: "IPV4"
+        Value: "122.248.234.23/32"
+      -
+        Type: "IPV4"
+        Value: "128.199.195.156/32"
+      -
+        Type: "IPV4"
+        Value: "138.197.150.151/32"
+      -
+        Type: "IPV4"
+        Value: "139.59.173.249/32"
+      -
+        Type: "IPV4"
+        Value: "146.185.143.14/32"
+      -
+        Type: "IPV4"
+        Value: "159.203.30.41/32"
+      -
+        Type: "IPV4"
+        Value: "159.89.8.111/32"
+      -
+        Type: "IPV4"
+        Value: "178.62.52.237/32"
+      -
+        Type: "IPV4"
+        Value: "18.221.56.27/32"
+      -
+        Type: "IPV4"
+        Value: "188.226.183.141/32"
+      -
+        Type: "IPV4"
+        Value: "216.144.250.150/32"
+      -
+        Type: "IPV4"
+        Value: "34.233.66.117/32"
+      -
+        Type: "IPV4"
+        Value: "46.101.250.135/32"
+      -
+        Type: "IPV4"
+        Value: "46.137.190.132/32"
+      -
+        Type: "IPV4"
+        Value: "52.60.129.180/32"
+      -
+        Type: "IPV4"
+        Value: "54.64.67.106/32"
+      -
+        Type: "IPV4"
+        Value: "54.67.10.127/32"
+      -
+        Type: "IPV4"
+        Value: "54.79.28.129/32"
+      -
+        Type: "IPV4"
+        Value: "54.94.142.218/32"
+
+      ##End Uptime Robot
+      ## AWS Route53 Health Check
+      ## https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/route-53-ip-addresses.html
+      ## us-east-1
+      -
+        Type: "IPV4"
+        Value: "54.243.31.192/26"
+      -
+        Type: "IPV4"
+        Value: "107.23.255.0/26"
+        
+      ### us-west-1
+      -
+        Type: "IPV4"
+        Value: "54.183.255.128/26"
+      -
+        Type: "IPV4"
+        Value: "54.241.32.64/26"
+
+      ## us-west-2
+      -
+        Type: "IPV4"
+        Value: "54.244.52.192/26"
+      -
+        Type: "IPV4"
+        Value: "54.245.168.0/26"
+      ## End AWS Route53 Health Check
 
   WAFBlacklistSet:
     Type: 'AWS::WAF::IPSet'
@@ -292,6 +417,213 @@ Resources:
           Negated: false
           Type: XssMatch
 
+## Mitigate abnormal requests via size restrictions
+## Enforce consistent request hygene, limit size of key elements
+  WAFSizeRestrictionSet:
+    Type: AWS::WAF::SizeConstraintSet
+    Properties:
+      Name: !Sub '${ParentStackName} - Size Restrictions'
+      SizeConstraints:
+        - FieldToMatch:
+            Type: URI
+          TextTransformation: NONE
+          ComparisonOperator: GT
+          Size: !Ref MaxExpectedURISize
+        - FieldToMatch:
+            Type: QUERY_STRING
+          TextTransformation: NONE
+          ComparisonOperator: GT
+          Size: !Ref MaxExpectedQueryStringSize
+        - FieldToMatch:
+            Type: BODY
+          TextTransformation: NONE
+          ComparisonOperator: GT
+          Size: !Ref MaxExpectedBodySize
+        - FieldToMatch:
+            Type: HEADER
+            Data: cookie
+          TextTransformation: NONE
+          ComparisonOperator: GT
+          Size: !Ref MaxExpectedCookieSize
+
+  WAFSizeRestrictionRule:
+    Type: AWS::WAF::Rule
+    Properties:
+      Name: !Sub '${ParentStackName} - Size Restriction Rule'
+      MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'SizeRestrictionRule']]
+      Predicates:
+        - Type: SizeConstraint
+          Negated: false
+          DataId: !Ref WAFSizeRestrictionSet
+
+## Blacklist bad/hijacked JWT tokens or session IDs
+## Matches the specific values in the cookie or Authorization header
+## for JWT it is sufficient to check the signature
+##  WAFAuthTokenStringSet:
+##    Type: AWS::WAF::ByteMatchSet
+##    Properties:
+##      Name: !Sub '${ParentStackName} - Match Auth Tokens'
+##      ByteMatchTuples:
+##        - FieldToMatch:
+##            Type: HEADER
+##            Data: cookie
+##          PositionalConstraint: CONTAINS
+##          TargetString: example-session-id
+##          TextTransformation: URL_DECODE
+##        - FieldToMatch:
+##            Type: HEADER
+##            Data: authorization
+##          PositionalConstraint: ENDS_WITH
+##          TargetString: .TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ
+##          TextTransformation: URL_DECODE
+
+##  WAFAuthTokenRule:
+##    Type: AWS::WAF::Rule
+##    Properties:
+##      Name: !Sub '${ParentStackName} - Bad Auth Token Rule'
+##      MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'BadAuthTokenRule']]
+##      Predicates:
+##        - Type: ByteMatch
+##          Negated: false
+##          DataId: !Ref WAFAuthTokenStringSet
+
+## Blacklist bad User-Agent headers
+  WAFUserAgentStringSet:
+    Type: AWS::WAF::ByteMatchSet
+    Properties:
+      Name: !Sub '${ParentStackName} - Match User Agent'
+      ByteMatchTuples:
+        - FieldToMatch:
+            Type: HEADER
+            Data: user-agent
+          PositionalConstraint: CONTAINS
+          TargetString: bad-user-agent-1
+          TextTransformation: URL_DECODE
+        - FieldToMatch:
+            Type: HEADER
+            Data: user-agent
+          PositionalConstraint: CONTAINS
+          TargetString: bad-user-agent-2
+          TextTransformation: URL_DECODE
+
+  WAFUserAgentRule:
+    Type: AWS::WAF::Rule
+    Properties:
+      Name: !Sub '${ParentStackName} - Bad User Agent Rule'
+      MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'BadUserAgentRule']]
+      Predicates:
+        - Type: ByteMatch
+          Negated: false
+          DataId: !Ref WAFUserAgentStringSet
+
+## Path Traversal, LFI, RFI
+## Matches request patterns designed to traverse filesystem paths, and include
+## local or remote files
+##  WAFPathsStringSet:
+##    Type: AWS::WAF::ByteMatchSet
+##    Properties:
+##      Name: !Sub '${ParentStackName} - Match RFI LFI Traversal'
+##      ByteMatchTuples:
+##        - FieldToMatch:
+##            Type: URI
+##          PositionalConstraint: CONTAINS
+##          TargetString: ../
+##          TextTransformation: URL_DECODE
+##        - FieldToMatch:
+##            Type: URI
+##          PositionalConstraint: CONTAINS
+##          TargetString: ../
+##          TextTransformation: HTML_ENTITY_DECODE
+##        - FieldToMatch:
+##            Type: QUERY_STRING
+##          PositionalConstraint: CONTAINS
+##          TargetString: ../
+##          TextTransformation: URL_DECODE
+##        - FieldToMatch:
+##            Type: QUERY_STRING
+##          PositionalConstraint: CONTAINS
+##          TargetString: ../
+##          TextTransformation: HTML_ENTITY_DECODE
+##        - FieldToMatch:
+##            Type: URI
+##          PositionalConstraint: CONTAINS
+##          TargetString: ://
+##          TextTransformation: URL_DECODE
+##        - FieldToMatch:
+##            Type: URI
+##          PositionalConstraint: CONTAINS
+##          TargetString: ://
+##          TextTransformation: HTML_ENTITY_DECODE
+##        - FieldToMatch:
+##            Type: QUERY_STRING
+##          PositionalConstraint: CONTAINS
+##          TargetString: ://
+##          TextTransformation: URL_DECODE
+##        - FieldToMatch:
+##            Type: QUERY_STRING
+##          PositionalConstraint: CONTAINS
+##          TargetString: ://
+##          TextTransformation: HTML_ENTITY_DECODE
+
+##  WAFPathsRule:
+##    Type: 'AWS::WAF::Rule'
+##    Properties:
+##      Name: !Sub '${ParentStackName} - Detect RFI LFI Rule'
+##      MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'DetectRFILFIRule']]
+##      Predicates:
+##        - Type: ByteMatch
+##          Negated: false
+##          DataId: !Ref WAFPathsStringSet
+
+## CSRF token enforcement 
+## Enforce the presence of CSRF token in request header
+##  WAFCSRFMethodStringSet:
+##    Type: 'AWS::WAF::ByteMatchSet'
+##    Properties:
+##      Name: !Sub '${ParentStackName} - Match CSRF Method'
+##      ByteMatchTuples:
+##        - FieldToMatch:
+##            Type: METHOD
+##          PositionalConstraint: EXACTLY
+##          TargetString: post
+##          TextTransformation: LOWERCASE
+
+##  WAFCSRFTokenSizeConstraint:
+##    Type: 'AWS::WAF::SizeConstraintSet'
+##    Properties:
+##      Name: !Sub '${ParentStackName} - Match CSRF Token'
+##      SizeConstraints:
+##        - FieldToMatch:
+##            Type: HEADER
+##            Data: !Ref CSRFExpectedHeader
+##          TextTransformation: NONE
+##          ComparisonOperator: EQ
+##          Size: !Ref CSRFExpectedSize
+
+##  WAFCSRFRule:
+##    Type: 'AWS::WAF::Rule'
+##    Properties:
+##      Name: !Sub '${ParentStackName} - Enforce CSRF'
+##      MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'EnforceCSRF']]
+##      Predicates:
+##        - Type: ByteMatch
+##          Negated: false
+##          DataId: !Ref WAFCSRFMethodStringSet
+##        - Type: SizeConstraint
+##          Negated: true
+##          DataId: !Ref WAFCSRFTokenSizeConstraint
+
+## GeoMatch rule. It relies on Geo Match with Id = f8d2a474-fad5-4b71-b95e-76778cf4859f to exists.
+  WAFGeoMatchRule: 
+    Type: 'AWS::WAF::Rule'
+    Properties: 
+      Name: !Sub '${ParentStackName} - GeoMatch Rule'
+      MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'GeoMatchRule']]
+      Predicates: 
+        - Type: GeoMatch
+          DataId: 'f8d2a474-fad5-4b71-b95e-76778cf4859f'
+          Negated: true          
+
   WAFWebACL:
     Type: 'AWS::WAF::WebACL'
     Properties:
@@ -304,6 +636,30 @@ Resources:
             Type: ALLOW
           Priority: 10
           RuleId: !Ref WAFWhitelistRule
+        - Action:
+            Type: BLOCK
+          Priority: 100
+          RuleId: !Ref WAFSizeRestrictionRule
+#        - Action:
+#            Type: BLOCK
+#          Priority: 110
+#          RuleId: !Ref WAFAuthTokenRule
+#        - Action:
+#            Type: BLOCK
+#          Priority: 120
+#          RuleId: !Ref WAFPathsRule
+#        - Action:
+#            Type: BLOCK
+#          Priority: 130
+#          RuleId: !Ref WAFCSRFRule
+        - Action:
+            Type: BLOCK
+          Priority: 140
+          RuleId: !Ref WAFGeoMatchRule
+        - Action:
+            Type: BLOCK
+          Priority: 150
+          RuleId: !Ref WAFUserAgentRule
     Metadata:
       cfn_nag:
         rules_to_suppress:
@@ -829,6 +1185,24 @@ Outputs:
   WAFXssRule:
     Value: !Ref WAFXssRule
     Condition: CrossSiteScriptingProtectionActivated
+
+  WAFSizeRestrictionRule:
+    Value: !Ref WAFSizeRestrictionRule
+
+  #WAFAuthTokenRule:
+  #  Value: !Ref WAFAuthTokenRule
+
+  #WAFPathsRule:
+  #  Value: !Ref WAFPathsRule
+
+  #WAFCSRFRule:
+  #  Value: !Ref WAFCSRFRule
+
+  WAFGeoMatchRule:
+    Value: !Ref WAFGeoMatchRule
+
+  WAFUserAgentStringSet:
+    Value: !Ref WAFUserAgentRule
 
   WAFWebACL:
     Value: !Ref WAFWebACL
