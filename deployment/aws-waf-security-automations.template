@@ -85,7 +85,7 @@ Metadata:
 Parameters:
   ActivateSqlInjectionProtectionParam:
     Type: String
-    Default: 'yes'
+    Default: 'no'
     AllowedValues:
       - 'yes'
       - 'no'
@@ -111,7 +111,7 @@ Parameters:
 
   ActivateScannersProbesProtectionParam:
     Type: String
-    Default: 'yes - AWS Lambda log parser'
+    Default: 'yes - Amazon Athena log parser'
     AllowedValues:
       - 'yes - AWS Lambda log parser'
       - 'yes - Amazon Athena log parser'
