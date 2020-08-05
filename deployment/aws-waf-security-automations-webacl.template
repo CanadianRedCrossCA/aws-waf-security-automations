@@ -35,6 +35,14 @@ Parameters:
     Type: String
   ActivateBadBotProtectionParam:
     Type: String
+  ActivateUserAgentProtectionParam:
+    Type: String
+  ActivateSizeProtectionParam:
+    Type: String
+  ActivateCanadaOnlyProtectionParam:
+    Type: String
+  ActivateBlockDisasterProtectionParam:
+    Type: String
   RequestThreshold:
     Type: Number
   RegionScope:
@@ -97,6 +105,22 @@ Conditions:
 
   BadBotProtectionActivated: !Equals
     - !Ref ActivateBadBotProtectionParam
+    - 'yes'
+
+  UserAgentProtectionActivated: !Equals
+    - !Ref ActivateUserAgentProtectionParam
+    - 'yes'
+
+  SizeProtectionActivated: !Equals
+    - !Ref ActivateSizeProtectionParam
+    - 'yes'
+
+  CanadaOnlyProtectionActivated: !Equals
+    - !Ref ActivateCanadaOnlyProtectionParam
+    - 'yes'
+
+  BlockDisasterProtectionActivated: !Equals
+    - !Ref ActivateBlockDisasterProtectionParam
     - 'yes'
 
 Mappings:
@@ -192,7 +216,50 @@ Resources:
       IPAddressVersion: 'IPV4'
       Name: !Sub '${ParentStackName}WhitelistSetIPV4'
       Description: 'Allow whitelist for IPV4 addresses'
-      Addresses: []
+      Addresses: 
+      ##Citrix
+      - 209.171.43.251/32
+
+      ##Uptime Robot
+      - 69.162.124.224/28
+      - 63.143.42.240/28
+      - 216.245.221.80/28
+      - 104.131.107.63/32
+      - 122.248.234.23/32
+      - 128.199.195.156/32
+      - 138.197.150.151/32
+      - 139.59.173.249/32
+      - 146.185.143.14/32
+      - 159.203.30.41/32
+      - 159.89.8.111/32
+      - 178.62.52.237/32
+      - 18.221.56.27/32
+      - 188.226.183.141/32
+      - 216.144.250.150/32
+      - 34.233.66.117/32
+      - 46.101.250.135/32
+      - 46.137.190.132/32
+      - 52.60.129.180/32
+      - 54.64.67.106/32
+      - 54.67.10.127/32
+      - 54.79.28.129/32
+      - 54.94.142.218/32
+      ##End Uptime Robot
+
+      ## AWS Route53 Health Check
+      ## https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/route- 53- ip- addresses.html
+      ## us- east- 1
+      - 54.243.31.192/26
+      - 107.23.255.0/26
+
+      ### us- west- 1
+      - 54.183.255.128/26
+      - 54.241.32.64/26
+
+      ## us- west- 2
+      - 54.244.52.192/26
+      - 54.245.168.0/26
+      ## End AWS Route53 Health Check      
 
   WAFBlacklistSetV4:
     Type: 'AWS::WAFv2::IPSet'
@@ -604,7 +671,132 @@ Resources:
                         - Priority: 2
                           Type: HTML_ENTITY_DECODE
           - !Ref 'AWS::NoValue'
-
+        - !If
+          - UserAgentProtectionActivated
+          - Name: !Sub '${ParentStackName}UserAgentRule'
+            Priority: 50
+            Action:
+              Block: {}
+            VisibilityConfig:
+              SampledRequestsEnabled: true
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'UserAgentRule']]
+            Statement:
+              OrStatement:
+                Statements:
+                  - ByteMatchStatement:
+                      FieldToMatch:
+                        SingleHeader:
+                          Name: user-agent
+                      PositionalConstraint: CONTAINS_WORD
+                      SearchString: badbot
+                      TextTransformations:
+                        - Priority: 0
+                          Type: NONE
+                  - ByteMatchStatement:
+                      FieldToMatch:
+                        SingleHeader:
+                          Name: user-agent
+                      PositionalConstraint: CONTAINS_WORD
+                      SearchString: badbot2
+                      TextTransformations:
+                        - Priority: 0
+                          Type: NONE
+          - !Ref 'AWS::NoValue'
+        - !If
+          - CanadaOnlyProtectionActivated
+          - Name: !Sub '${ParentStackName}CanadaOnlyRule'
+            Priority: 60
+            Action:
+              Block: {}
+            VisibilityConfig:
+              SampledRequestsEnabled: true
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'CanadaOnlyRule']]
+            Statement:
+              NotStatement:
+                Statement:
+                  GeoMatchStatement:
+                    CountryCodes:
+                    - CA
+          - !Ref 'AWS::NoValue'
+        - !If
+          - BlockDisasterProtectionActivated
+          - Name: !Sub '${ParentStackName}BlockDisasterRule'
+            Priority: 70
+            Action:
+              Block: {}
+            VisibilityConfig:
+              SampledRequestsEnabled: true
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'BlockDisasterRule']]
+            Statement:
+              OrStatement:
+                Statements:
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      UriPath: {}
+                    PositionalConstraint: CONTAINS
+                    SearchString: 11111111-1111-1111-1111-111111111111
+                    TextTransformations:
+                    - Type: LOWERCASE
+                      Priority: 0
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      UriPath: {}
+                    PositionalConstraint: CONTAINS
+                    SearchString: 11111111-1111-1111-1111-111111111111
+                    TextTransformations:
+                    - Type: LOWERCASE
+                      Priority: 0
+          - !Ref 'AWS::NoValue'
+        - !If
+          - SizeProtectionActivated
+          - Name: !Sub '${ParentStackName}SizeRule'
+            Priority: 40
+            Action:
+              Block: {}
+            VisibilityConfig:
+              SampledRequestsEnabled: true
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'XssRule']]
+            Statement:
+              OrStatement:
+                Statements:
+                - SizeConstraintStatement:
+                    FieldToMatch:
+                      QueryString: {}
+                    ComparisonOperator: GT
+                    Size: 1024
+                    TextTransformations:
+                    - Type: NONE
+                      Priority: 0
+                - SizeConstraintStatement:
+                    FieldToMatch:
+                      Body: {}
+                    ComparisonOperator: GT
+                    Size: 16384
+                    TextTransformations:
+                    - Type: NONE
+                      Priority: 0
+                - SizeConstraintStatement:
+                    FieldToMatch:
+                      UriPath: {}
+                    ComparisonOperator: GT
+                    Size: 512
+                    TextTransformations:
+                    - Type: NONE
+                      Priority: 0
+                - SizeConstraintStatement:
+                    FieldToMatch:
+                      SingleHeader:
+                        Name: cookie
+                    ComparisonOperator: GT
+                    Size: 4093
+                    TextTransformations:
+                    - Type: NONE
+                      Priority: 0
+          - !Ref 'AWS::NoValue'
 Outputs:
 # Arns
   WAFWhitelistSetV4Arn:

@@ -34,6 +34,10 @@ Metadata:
           - ActivateScannersProbesProtectionParam
           - ActivateReputationListsProtectionParam
           - ActivateBadBotProtectionParam
+          - ActivateUserAgentProtectionParam
+          - ActivateSizeProtectionParam
+          - ActivateCanadaOnlyProtectionParam
+          - ActivateBlockDisasterProtectionParam
 
       - Label:
           default: Settings
@@ -70,6 +74,18 @@ Metadata:
 
       ActivateBadBotProtectionParam:
         default: Activate Bad Bot Protection
+
+      ActivateUserAgentProtectionParam:
+        default: Activate User Agent Rule
+
+      ActivateSizeProtectionParam:
+        default: Activate Size Rule
+
+      ActivateCanadaOnlyProtectionParam:
+        default: Activate Canada only Rule
+
+      ActivateBlockDisasterProtectionParam:
+        default: Activate Disaster Blocking Rule
 
       EndpointType:
         default: Endpoint Type
@@ -150,6 +166,38 @@ Parameters:
       - 'yes'
       - 'no'
     Description: Choose yes to enable the component designed to block bad bots and content scrapers.
+
+  ActivateUserAgentProtectionParam:
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Description: Choose yes to enable the component designed to block clients with given User-Agent headers.
+
+  ActivateSizeProtectionParam:
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Description: Choose yes to enable the component designed to block requests exceeding the allowed size.
+
+  ActivateCanadaOnlyProtectionParam:
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Description: Choose yes to enable the component designed to block requests that are not originating from Canada.
+
+  ActivateBlockDisasterProtectionParam:
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Description: Choose yes to enable the component designed to block requests that contain given disaster Id.
 
   EndpointType:
     Type: String
@@ -348,6 +396,10 @@ Resources:
         ActivateScannersProbesProtectionParam: !Ref ActivateScannersProbesProtectionParam
         ActivateReputationListsProtectionParam: !Ref ActivateReputationListsProtectionParam
         ActivateBadBotProtectionParam: !Ref ActivateBadBotProtectionParam
+        ActivateUserAgentProtectionParam: !Ref ActivateUserAgentProtectionParam
+        ActivateSizeProtectionParam: !Ref ActivateSizeProtectionParam
+        ActivateCanadaOnlyProtectionParam: !Ref ActivateCanadaOnlyProtectionParam
+        ActivateBlockDisasterProtectionParam: !Ref ActivateBlockDisasterProtectionParam
         RequestThreshold: !Ref RequestThreshold
         RegionScope: !If [AlbEndpoint, 'REGIONAL', 'CLOUDFRONT']
         ParentStackName: !Ref 'AWS::StackName'
@@ -1635,6 +1687,10 @@ Resources:
       ActivateScannersProbesProtectionParam: !Ref ActivateScannersProbesProtectionParam
       ActivateReputationListsProtectionParam: !Ref ActivateReputationListsProtectionParam
       ActivateBadBotProtectionParam: !Ref ActivateBadBotProtectionParam
+      ActivateUserAgentProtectionParam: !Ref ActivateUserAgentProtectionParam
+      ActivateSizeProtectionParam: !Ref ActivateSizeProtectionParam
+      ActivateCanadaOnlyProtectionParam: !Ref ActivateCanadaOnlyProtectionParam
+      ActivateBlockDisasterProtectionParam: !Ref ActivateBlockDisasterProtectionParam      
       ActivateAWSManagedRulesParam: !Ref ActivateAWSManagedRulesParam
       KeepDataInOriginalS3Location: !Ref KeepDataInOriginalS3Location
       # AWS WAF Web ACL

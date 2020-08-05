@@ -404,7 +404,7 @@ Resources:
       Type: AWS::Athena::WorkGroup
       Condition: AthenaLogParser
       Properties:
-        Name: WAFAddPartitionAthenaQueryWorkGroup
+        Name: !Sub '${ParentStackName}-WAFAddPartitionAthenaQueryWorkGroup'
         Description: Athena WorkGroup for adding Athena partition queries used by AWS WAF Security Automations Solution
         State: ENABLED
         RecursiveDeleteOption: true
@@ -415,7 +415,7 @@ Resources:
       Type: AWS::Athena::WorkGroup
       Condition: HttpFloodAthenaLogParser
       Properties:
-        Name: WAFLogAthenaQueryWorkGroup
+        Name: !Sub '${ParentStackName}-WAFLogAthenaQueryWorkGroup'
         Description: Athena WorkGroup for WAF log queries used by AWS WAF Security Automations Solution
         State: ENABLED
         RecursiveDeleteOption: true
@@ -426,7 +426,7 @@ Resources:
       Type: AWS::Athena::WorkGroup
       Condition: ScannersProbesAthenaLogParser
       Properties:
-        Name: WAFAppAccessLogAthenaQueryWorkGroup
+        Name: !Sub '${ParentStackName}-WAFAppAccessLogAthenaQueryWorkGroup'
         Description: Athena WorkGroup for CloudFront or ALB application access log queries used by AWS WAF Security Automations Solution
         State: ENABLED
         RecursiveDeleteOption: true
