@@ -9,3 +9,4 @@
 /deployment/global-s3-assets/
 /deployment/regional-s3-assets/
 /source/*/lib
+/deployment/notes.txt

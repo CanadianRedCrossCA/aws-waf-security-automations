@@ -79,8 +79,36 @@ prod-app-emis-waf
 prod-api-emis-waf
 
 
-For Prod and Train we are going to use all the rules except for the AWSManagedRules and SqlInjectionRule.
+For Prod, Train and UAT we are going to use the following rules: 
+APP:
+ - WhitelistRule
+ - BlacklistRule
+ - HttpFloodRateBasedRule
+ - ScannersAndProbesRule
+ - IPReputationListsRule
+ - BadBotRule
+ - XssRule
+ - SizeRule
+ - UserAgentRule
+ - CanadaOnlyRule
+ 
+API:
+ - WhitelistRule
+ - BlacklistRule
+ - HttpFloodRateBasedRule
+ - ScannersAndProbesRule
+ - IPReputationListsRule
+ - XssRule
+ - SizeRule
+ - UserAgentRule
+ - CanadaOnlyRule
+ - BlockDisasterRule
+
+The difference between the APP and the API WAF ACLs is that the BadBotRule doesn't apply in the API WAF and the BlockDisasterRule doesn't apply in the APP WAF.
 For "Application Access Log Bucket Name" you need to specify the bucket which contains the CloudFront logs. The current buckets are:
+
+uat-emis-registration-app-access-logs-us-east-1
+uat-emis-registration-api-access-logs-us-east-1
 
 train-emis-registration-app-access-logs-us-east-1
 train-emis-registration-api-access-logs-us-east-1
@@ -88,9 +116,11 @@ train-emis-registration-api-access-logs-us-east-1
 prod-emis-registration-app-access-logs-us-east-1
 prod-emis-registration-api-access-logs-us-east-1
 
-Leave all other options as they are.
+For PROD and TRAIN the Default Action will be "Allow".
 
-For DEV, QA and UAT ,we are going to use only the whitelist and blacklist rules, since those environments are locked down for only CRC and Tesera access.
+For UAT the Default Action will be changed to "Block" after the WAF ACL is created. The reason to keep all the WAF rules in UAT, but change the Default Action to "Block" is to have an environment where we can run penetration tests. Before a PEN test is run, we are going to be changing the Default Action to "Allow" for the time duration of the PEN test, allowing us to test against the same configurations as in TRAIN and PROD.
+
+For DEV and QA we are going to use only the WhitelistRule and the BlacklistRule rules, since those environments are locked down for only CRC and Tesera access. After the WAF ACLs are created in DEV and QA the Default Action will be changed to "Block".
 
 Click "Next"
 
