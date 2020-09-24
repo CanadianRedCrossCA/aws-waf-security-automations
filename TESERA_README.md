@@ -14,15 +14,20 @@ This repo is a clone of the original AWS WAF Security Automations solution, and 
  - Blacklist bad User-Agent rule - a list of User-Agent headers that is going to be blocked;
  - Size restriction rule - Mitigate abnormal requests via size restrictions. Enforce consistent request hygene, limit size of key elements;
  - Geo match rule - Allow access only within Canada.
+ - Disable disaster/event id rule - this rule will block requests that contain given disaster ids in their URI.
 
 ## Build
 Prerequisites - To build the lambdas used in this solution you'll need:
- - Node.js 10.x
  - Python 3.8
 
 When modifications are required run the following command from the `deployment` folder to create a new build:
- - `./build-s3-dist.sh emis-aws-waf-security-automations-template emis-aws-waf-code EMIsAWSWAFSecurityAutomations 2.3.2`
- If the version of this solution needs to be updated the number `2.3.2` can be changed to the desired new version.
+ - `TEMPLATE_OUTPUT_BUCKET=emis-aws-waf-security-automations`
+ - `DIST_OUTPUT_BUCKET=emis-aws-waf-code`
+ - `SOLUTION_NAME=aws-waf-security-automations`
+ - `VERSION=3.0.0`
+ - `AWS_REGION=us-east-1`
+ - `./build-s3-dist.sh $TEMPLATE_OUTPUT_BUCKET $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION`
+ If the version of this solution needs to be updated the number `3.0.0` can be changed to the desired new version.
  This command will create (or replace the content of) two subfolders in the `deployment` folder:
   - `global-s3-assets` - contains the cloudformation templates;
   - `regional-s3-assets` - contains the source code for the lambda functions used by this solution.
@@ -30,71 +35,92 @@ When modifications are required run the following command from the `deployment` 
 
 ## Upload the build to S3 
 To deploy the build you need to execute the following commands from the `deployment` folder:
-  `aws s3 cp --recursive global-s3-assets/ s3://emis-aws-waf-security-automations-template/EMIsAWSWAFSecurityAutomations/2.3.2/ --profile redcross`
+  `aws s3 cp global-s3-assets s3://$TEMPLATE_OUTPUT_BUCKET/aws-waf-security-automations/$VERSION --recursive --acl bucket-owner-full-control --profile redcross`
  
 and 
 
-  `aws s3 cp --recursive regional-s3-assets/ s3://emis-aws-waf-code-ca-central-1/EMIsAWSWAFSecurityAutomations/2.3.2/ --profile redcross`
+  `aws s3 cp regional-s3-assets s3://$DIST_OUTPUT_BUCKET-$AWS_REGION/aws-waf-security-automations/$VERSION --recursive --acl bucket-owner-full-control --profile redcross`
 
-If the version has changed the new version should be used instead of `2.3.2` in both `aws s3 cp` commands.
+## Limitations and issues of the Cloudformation template
+ - The Cloudformation resource AWS::WAFv2::IPSet has a requirement for the WAFv2 resources to be created in the US East (N. Virginia) Region, us-east-1 (https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-wafv2-ipset.html). This will enforce us to create the WebACL in us-east-1, and also move the logging bucket for the Cloudfront distributions to us-east-1.
 
-## Limitations
- - Cloudformation doesn't support `AWS::WAF::GeoMatchSet`, but it only supports `AWS::WAFRegional::GeoMatchSet`. For the GeoMatch Rule we needed to create manually a GeoMatchSet to be used with the rule. Our implementation relies on GeoMatchSet with id `f8d2a474-fad5-4b71-b95e-76778cf4859f` to exist.
+ - There is a limitation for the length of the WebACL name we can pick. Due to the way the Cloudformation template is implemented, when the permissions are created if the name of the template is long, it will be shortened and the roles with permissions that are assigned to the lambda functions endup granting permissions for the incorrect resources. Using names with lengts similar to the examples specified here works fine.
 
- - WAF Classic allows only up to 10 rules per ACL - currently we are maxing out the number of rules. We opened a quota increase ticket and after quite lengthy communication with AWS Support. Even though the support case was approved, the limitations is still in place, so at the moment we can not add new rules without removing an existing one.
-
- - WAF Classic has a limitation of up to 5 "Rate Rules" per account and per region. Since all of our environments are in the same account and region, and we have 10 Web ACLs in total, we can not have a separate HTTP Flood Rule in all of the Web ACLs. This forced us to share the API Flood Rule with the APP Web ACL. See the Deployment section below for details how to apply the sharing.
+ - The firehose-athena template originally created workgroups with hardcoded names, which is causing duplicate error (name already exsists), so we had to prefix the the workgroup names with the Stack name.
 
 ## Deployment
 After the build is uploaded to S3, we can use it to deploy the solutions. 
 The deployment can be done from the AWS Management Console -> CloudFormation.
-Make sure you are located in the ca-central-1 region.
+Make sure you are located in the us-east-1 region.
 
 Select Create Stack -> with new Resources.
 
 Select "Template is ready"
-For template source select "Amazon S3 URL", and specify the location of the template like - `https://emis-aws-waf-security-automations-template.s3.ca-central-1.amazonaws.com/EMIsAWSWAFSecurityAutomations/2.3.2/aws-waf-security-automations.template`
+For template source select "Amazon S3 URL", and specify the location of the template like - `https://emis-aws-waf-security-automations.s3.us-east-1.amazonaws.com/aws-waf-security-automations/3.0.0/aws-waf-security-automations.template`
 
 Click "Next"
 
 In each Environment Dev, QA, UAT, Train and Prod we have two Web ACLs - one for the APP and one for the API, both attached to the CloudFront distributions.
 The current names of the Web ACLs are:
 
-dev-app-ca-central-1-AWSWAFSecurityAutomations
-dev-api-ca-central-1-AWSWAFSecurityAutomations
+dev-app-emis-waf
+dev-api-emis-waf
 
-qa-app-ca-central-1-AWSWAFSecurityAutomations
-qa-api-ca-central-1-AWSWAFSecurityAutomations
+qa-app-emis-waf
+qa-api-emis-waf
 
-uat-app-ca-central-1-AWSWAFSecurityAutomations
-uat-api-ca-central-1-AWSWAFSecurityAutomations
+uat-app-emis-waf
+uat-api-emis-waf
 
-train-app-ca-central-1-AWSWAFSecurityAutomations
-train-api-ca-central-1-AWSWAFSecurityAutomations
+train-app-emis-waf
+train-api-emis-waf
 
-prod-app-ca-central-1-AWSWAFSecurityAutomations
-prod-api-ca-central-1-AWSWAFSecurityAutomations
+prod-app-emis-waf
+prod-api-emis-waf
 
-Use one of these names, or if you are creating a new Web ACL while Web ACL with the same name exists, you can add a suffix after the name like "dev-app-ca-central-1-AWSWAFSecurityAutomations1".
 
+For Prod, Train and UAT we are going to use the following rules: 
+APP:
+ - WhitelistRule
+ - BlacklistRule
+ - HttpFloodRateBasedRule
+ - ScannersAndProbesRule
+ - IPReputationListsRule
+ - BadBotRule
+ - XssRule
+ - SizeRule
+ - UserAgentRule
+ - CanadaOnlyRule
+ 
+API:
+ - WhitelistRule
+ - BlacklistRule
+ - HttpFloodRateBasedRule
+ - ScannersAndProbesRule
+ - IPReputationListsRule
+ - XssRule
+ - SizeRule
+ - UserAgentRule
+ - CanadaOnlyRule
+ - BlockDisasterRule
+
+The difference between the APP and the API WAF ACLs is that the BadBotRule doesn't apply in the API WAF and the BlockDisasterRule doesn't apply in the APP WAF.
 For "Application Access Log Bucket Name" you need to specify the bucket which contains the CloudFront logs. The current buckets are:
 
-dev-emis-registration-app-access-logs
-dev-emis-registration-api-access-logs
+uat-emis-registration-app-access-logs-us-east-1
+uat-emis-registration-api-access-logs-us-east-1
 
-qa-emis-registration-app-access-logs
-qa-emis-registration-api-access-logs
+train-emis-registration-app-access-logs-us-east-1
+train-emis-registration-api-access-logs-us-east-1
 
-uat-emis-registration-app-access-logs
-uat-emis-registration-api-access-logs
+prod-emis-registration-app-access-logs-us-east-1
+prod-emis-registration-api-access-logs-us-east-1
 
-train-emis-registration-app-access-logs
-train-emis-registration-api-access-logs
+For PROD and TRAIN the Default Action will be "Allow".
 
-prod-emis-registration-app-access-logs
-prod-emis-registration-api-access-logs
+For UAT the Default Action will be changed to "Block" after the WAF ACL is created. The reason to keep all the WAF rules in UAT, but change the Default Action to "Block" is to have an environment where we can run penetration tests. Before a PEN test is run, we are going to be changing the Default Action to "Allow" for the time duration of the PEN test, allowing us to test against the same configurations as in TRAIN and PROD.
 
-Leave all other options as they are.
+For DEV and QA we are going to use only the WhitelistRule and the BlacklistRule rules, since those environments are locked down for only CRC and Tesera access. After the WAF ACLs are created in DEV and QA the Default Action will be changed to "Block".
 
 Click "Next"
 
@@ -110,12 +136,8 @@ I acknowledge that AWS CloudFormation might require the following capability: CA
 
 Click "Create Stack"
 
-Sequence for deploying the Web ACL in APP and API:
-1. Create the Web ACL for the APP
-2. Remove the "HTTP Flood Rule" from APP Web ACL
-3. Create the Web ACL for the API
-4. In the APP Web ACL add the "HTTP Flood Rule" from the API Web ACL
-
 After the stacks are created they need to be attached to the CloudFront distributions. This needs to be done in Terraform in the registration-infrastructure repo, by specifying the Web ACL id in all environments for both the APP and the API, like:
 https://github.com/CanadianRedCrossCA/registration-infrastructure/blob/master/dev/app/terraform.tfvars#L5
 https://github.com/CanadianRedCrossCA/registration-infrastructure/blob/master/dev/api/terraform.tfvars#L15.
+
+When an update is required to the cloudformation templates or the the code of the lambdas, when a new build is created and uploaded the Cloudformation stacks can be updated instead of recreating fresh all resources. This way there won't be a need to change the Web ACL Id in CloudFront. The update is done throught the Update button on the CloudFormation's Stacks page. The rest of the deployment steps are the same as with creating a new stack.
